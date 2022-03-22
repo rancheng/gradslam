@@ -121,8 +121,8 @@ class TUM(data.Dataset):
         stride: Optional[int] = None,
         start: Optional[int] = None,
         end: Optional[int] = None,
-        height: int = 480,
-        width: int = 640,
+        height: int = 720,
+        width: int = 1280,
         channels_first: bool = False,
         normalize_color: bool = False,
         *,
@@ -138,8 +138,8 @@ class TUM(data.Dataset):
         basedir = os.path.normpath(basedir)
         self.height = height
         self.width = width
-        self.height_downsample_ratio = float(height) / 480
-        self.width_downsample_ratio = float(width) / 640
+        self.height_downsample_ratio = float(height) / 720
+        self.width_downsample_ratio = float(width) / 1280
         self.channels_first = channels_first
         self.normalize_color = normalize_color
 
@@ -294,7 +294,8 @@ class TUM(data.Dataset):
             associations, seq_timestamps = self._findAssociations(
                 rgb_text_file, depth_text_file, pose_text_file
             )
-
+            seq_timestamps = sorted(seq_timestamps, key=lambda x: float(x[0]))
+            associations = sorted(associations, key=lambda x: float(x[0].split("/")[-1].replace(".png", "")))
             for frame_num, association in enumerate(associations):
                 msg = "Incorrect reading from TUM associations"
                 if association[0][:3] != "rgb":
@@ -330,20 +331,26 @@ class TUM(data.Dataset):
         # Class members to store the list of valid filepaths.
         self.colorfiles = colorfiles
         self.depthfiles = depthfiles
+        # self.colorfiles = sorted(self.colorfiles, key=lambda x: float(x.split("/")[-1].replace(".png", "")))
+        # self.depthfiles = sorted(self.depthfiles, key=lambda x: float(x.split("/")[-1].replace(".png", "")))
         self.poses = poses
         self.framenames = framenames
         self.timestamps = timestamps
 
         # Camera intrinsics matrix for TUM dataset
+        # intrinsics = torch.tensor(
+        #     [[525.0, 0, 319.5, 0], [0, 525.0, 239.5, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+        # ).float()
         intrinsics = torch.tensor(
-            [[525.0, 0, 319.5, 0], [0, 525.0, 239.5, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            [[612.4511337280273, 0, 612.4297714233398, 0], [0, 612.4297714233398, 368.3033752441406, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
         ).float()
         self.intrinsics = datautils.scale_intrinsics(
             intrinsics, self.height_downsample_ratio, self.width_downsample_ratio
         ).unsqueeze(0)
 
         # Scaling factor for depth images
-        self.scaling_factor = 5000.0
+        # self.scaling_factor = 5000.0
+        self.scaling_factor = 1000.0
 
     def __len__(self):
         r"""Returns the length of the dataset. """
@@ -378,6 +385,7 @@ class TUM(data.Dataset):
         # Read in the color, depth, pose, label and intrinstics info.
         color_seq_path = self.colorfiles[idx]
         depth_seq_path = self.depthfiles[idx]
+
         pose_pointquat_seq = self.poses[idx] if self.load_poses else None
         framename = self.framenames[idx]
         timestamp_seq = self.timestamps[idx]
